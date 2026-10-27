@@ -1,0 +1,28 @@
+# .gitignore: files and folders Git must never track.
+# Rules apply only to files that were never committed; add rules before adding files.
+# A pattern ending in "/" matches folders only. Comments must sit on their own line.
+
+# --- Python environment --------------------------------------------------
+# Local virtual environment created by `uv sync`; rebuilt from uv.lock, never committed.
+.venv/
+
+# --- Python bytecode -------------------------------------------------------
+# Compiled files Python writes automatically when it imports a module.
+__pycache__/
+# Matches .pyc, .pyo and .pyd ([cod] = one of the letters c, o, d).
+*.py[cod]
+
+# --- Tool caches -----------------------------------------------------------
+# Speed-up caches for pytest, ruff and mypy; only useful on this machine.
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Build output ----------------------------------------------------------
+# Wheels and source archives produced by `uv build`; recreated from the code.
+dist/
+
+# --- Secrets ---------------------------------------------------------------
+# Real environment values (for example HF_TOKEN). Never commit this file;
+# the committed template with placeholders is .env.example.
+.env
