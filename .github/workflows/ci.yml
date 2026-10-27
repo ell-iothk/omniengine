@@ -1,0 +1,42 @@
+# ci.yml: GitHub Actions workflow that checks every push to main and every pull request.
+# It runs the same `make setup` and `make check` as a laptop, on a GitHub machine without a GPU,
+# so tests marked `gpu` are skipped here and run locally instead.
+
+name: CI
+
+# When the workflow runs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: the job only needs to read the repository.
+permissions:
+  contents: read
+
+# A newer commit on the same branch cancels the older, now outdated, run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # Stop a stuck run instead of burning the default six hours.
+    timeout-minutes: 15
+    steps:
+      # Actions are pinned to exact release tags so a new release cannot change CI silently.
+      - name: Check out the repository
+        uses: actions/checkout@v7.0.1
+
+      # Installs uv; uv then installs the Python version from .python-version.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.3.2
+
+      # uv sync --locked fails if uv.lock does not match pyproject.toml.
+      - name: Install dependencies and the git hook
+        run: make setup
+
+      # Lint, type check, tests without GPU, then every pre-commit hook on all files.
+      - name: Run all checks
+        run: make check
