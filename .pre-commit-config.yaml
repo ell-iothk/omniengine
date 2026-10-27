@@ -1,0 +1,47 @@
+# .pre-commit-config.yaml: checks that run automatically on every `git commit`.
+# If a check fails or changes a file, the commit is stopped so you can review and re-add.
+# Install the git hook once with `make setup`; run every check by hand with `make check`.
+
+repos:
+  # --- File hygiene -----------------------------------------------------------
+  # Standard hooks maintained by the pre-commit project, pinned to a release tag.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer        # every file ends with exactly one newline
+      - id: trailing-whitespace      # removes spaces at the end of lines
+      - id: check-yaml               # YAML files must parse (compose, CI workflows)
+      - id: check-toml               # TOML files must parse (pyproject.toml)
+      - id: check-merge-conflict     # blocks leftover <<<<<<< conflict markers
+      - id: check-added-large-files  # blocks accidental model weights or datasets
+        args: ["--maxkb=1024"]
+
+  # --- Project tools ------------------------------------------------------------
+  # "local" hooks run the tools installed by uv, so their versions come from uv.lock
+  # and stay identical to what `make lint` uses.
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+      - id: mypy
+        name: mypy
+        # mypy checks the whole project (files listed in pyproject.toml), not single files.
+        entry: uv run mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: detect-secrets
+        name: detect-secrets
+        # Fails if a new secret appears that is not already recorded in .secrets.baseline.
+        entry: uv run detect-secrets-hook --baseline .secrets.baseline
+        language: system
+        # uv.lock is full of hashes that look like secrets but are not.
+        exclude: ^uv\.lock$

@@ -10,8 +10,9 @@
 help: ## Show this list of targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-8s %s\n", $$1, $$2}'
 
-setup: ## Create .venv and install all dependencies exactly as locked in uv.lock
+setup: ## Install dependencies exactly as locked in uv.lock and the git pre-commit hook
 	uv sync --locked
+	uv run pre-commit install
 
 lint: ## Check style, common bugs and types without changing any file
 	uv run ruff check .
@@ -25,4 +26,5 @@ format: ## Fix what ruff can fix automatically and reformat the code
 test: ## Run the tests that need no GPU (the same set CI runs)
 	uv run pytest -m "not gpu"
 
-check: lint test ## Everything CI runs: lint, then tests
+check: lint test ## Everything CI runs: lint, tests, then every pre-commit hook on all files
+	uv run pre-commit run --all-files
