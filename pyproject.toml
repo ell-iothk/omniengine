@@ -1,25 +1,66 @@
+# pyproject.toml: the single source of truth for this Python project.
+# It declares package metadata, dependencies, the build backend and tool settings.
+# Exact dependency versions are locked in uv.lock; this file only sets lower bounds.
+
+# --- Package metadata --------------------------------------------------------
 [project]
 name = "omniengine"
 version = "0.1.0"
-description = "Add your description here"
+description = "Observable LLM Inference Platform Powered by vLLM for Agentic API Integration"
 readme = "README.md"
 authors = [
     { name = "fadelkresna", email = "kresnadfadel@gmail.com" }
 ]
 requires-python = ">=3.12"
+# Runtime dependencies of the omniengine tooling. Empty for now; vLLM itself is
+# never installed here because it runs inside its own container.
 dependencies = []
 
+# Installs a command named `omniengine` that calls omniengine.main().
 [project.scripts]
 omniengine = "omniengine:main"
 
+# --- Build backend -----------------------------------------------------------
+# uv_build turns src/omniengine into an installable package (src layout).
 [build-system]
 requires = ["uv_build>=0.12.18,<0.13.0"]
 build-backend = "uv_build"
 
+# --- Development tools -------------------------------------------------------
+# Installed by `uv sync`, never shipped with the package.
 [dependency-groups]
 dev = [
-    "detect-secrets>=1.5.0",
-    "pre-commit>=4.7.0",
-    "pytest>=9.1.1",
-    "ruff>=0.17.3",
+    "detect-secrets>=1.5.0",  # blocks commits that contain secrets
+    "mypy>=2.4.0",            # static type checker
+    "pre-commit>=4.7.0",      # runs checks automatically on every commit
+    "pytest>=9.1.1",          # test runner
+    "ruff>=0.17.3",           # linter and formatter
+]
+
+# --- Ruff: linting and formatting --------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Folders that hold first-party code, so imports are sorted correctly.
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# E/F: pycodestyle and pyflakes errors, I: import order, B: likely bugs,
+# UP: modern Python syntax, SIM: simpler equivalent code.
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+# --- mypy: static type checking ----------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+# Strict mode: every function needs type hints and untyped code is reported.
+strict = true
+files = ["src", "tests"]
+
+# --- pytest: tests -------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# -ra: summarize skipped and failed tests; --strict-markers: unknown markers fail.
+addopts = "-ra --strict-markers"
+markers = [
+    "gpu: needs a running GPU-backed vLLM server; run locally, skipped in CI",
 ]
