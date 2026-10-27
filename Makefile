@@ -1,0 +1,28 @@
+# Makefile: one-word commands for everyday tasks, used the same way locally and in CI.
+# Run `make help` to list targets. Recipe lines MUST be indented with a TAB, not spaces.
+
+# Targets below are commands, not files; .PHONY stops make from looking for files with these names.
+.PHONY: help setup lint format test check
+
+# Running plain `make` shows the help text.
+.DEFAULT_GOAL := help
+
+help: ## Show this list of targets
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-8s %s\n", $$1, $$2}'
+
+setup: ## Create .venv and install all dependencies exactly as locked in uv.lock
+	uv sync --locked
+
+lint: ## Check style, common bugs and types without changing any file
+	uv run ruff check .
+	uv run ruff format --check .
+	uv run mypy
+
+format: ## Fix what ruff can fix automatically and reformat the code
+	uv run ruff check --fix .
+	uv run ruff format .
+
+test: ## Run the tests that need no GPU (the same set CI runs)
+	uv run pytest -m "not gpu"
+
+check: lint test ## Everything CI runs: lint, then tests
