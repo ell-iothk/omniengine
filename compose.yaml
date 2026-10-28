@@ -21,6 +21,14 @@ services:
       # Longest prompt plus answer in tokens; it sizes the KV cache.
       - --max-model-len
       - ${OMNIENGINE_MAX_MODEL_LEN:-8192}
+      # Let the model call tools: when a request sends "tools", the parser turns the model's
+      # tool-call text into the OpenAI "tool_calls" field. The format depends on the model.
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - ${OMNIENGINE_TOOL_CALL_PARSER:?set OMNIENGINE_TOOL_CALL_PARSER in .env}
+      # Move the model's thinking out of "content" into a separate "reasoning" field.
+      - --reasoning-parser
+      - ${OMNIENGINE_REASONING_PARSER:?set OMNIENGINE_REASONING_PARSER in .env}
     environment:
       # Read models only from the mounted folder; never call the Hugging Face Hub at runtime.
       HF_HUB_OFFLINE: "1"
