@@ -17,7 +17,7 @@ services:
       - ${OMNIENGINE_MODEL_ALIAS:-local-llm}
       # Share of GPU memory vLLM may take for weights and KV cache.
       - --gpu-memory-utilization
-      - ${OMNIENGINE_GPU_MEMORY_UTILIZATION:-0.85}
+      - ${OMNIENGINE_GPU_MEMORY_UTILIZATION:-0.80}
       # Longest prompt plus answer in tokens; it sizes the KV cache.
       - --max-model-len
       - ${OMNIENGINE_MAX_MODEL_LEN:-8192}
