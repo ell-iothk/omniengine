@@ -9,6 +9,7 @@ import threading
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
 
 import pytest
 
@@ -20,8 +21,14 @@ class FakeVLLM:
     base_url: str = ""
     health_status: int = 200
     model_ids: list[str] = field(default_factory=lambda: ["local-llm"])
+    # Answer to every chat request; the defaults look like vLLM with both parsers on.
+    chat_content: str = "\n\n5"
+    chat_reasoning: str | None = "2 plus 3 is 5."
+    finish_reason: str = "stop"
     # The Authorization header of every request, or None when a request had none.
     auth_headers: list[str | None] = field(default_factory=list)
+    # The JSON body of every POST request, in order.
+    requests: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _handler_for(fake: FakeVLLM) -> type[BaseHTTPRequestHandler]:
@@ -41,6 +48,15 @@ def _handler_for(fake: FakeVLLM) -> type[BaseHTTPRequestHandler]:
             else:
                 self._send(404, {"error": f"no route for {self.path}"})
 
+        def do_POST(self) -> None:
+            fake.auth_headers.append(self.headers.get("Authorization"))
+            length = int(self.headers.get("Content-Length", "0"))
+            fake.requests.append(json.loads(self.rfile.read(length)))
+            if self.path == "/v1/chat/completions":
+                self._send(200, _chat_completion(fake))
+            else:
+                self._send(404, {"error": f"no route for {self.path}"})
+
         def _send(self, status: int, body: dict[str, object]) -> None:
             data = json.dumps(body).encode()
             self.send_response(status)
@@ -53,6 +69,19 @@ def _handler_for(fake: FakeVLLM) -> type[BaseHTTPRequestHandler]:
             """Silence the default one-line-per-request log, so test output stays readable."""
 
     return Handler
+
+
+def _chat_completion(fake: FakeVLLM) -> dict[str, object]:
+    """A response shaped like vLLM's, including its extra "reasoning" field."""
+    message = {"role": "assistant", "content": fake.chat_content, "reasoning": fake.chat_reasoning}
+    return {
+        "id": "chatcmpl-fake",
+        "object": "chat.completion",
+        "created": 0,
+        "model": "local-llm",
+        "choices": [{"index": 0, "message": message, "finish_reason": fake.finish_reason}],
+        "usage": {"prompt_tokens": 20, "completion_tokens": 12, "total_tokens": 32},
+    }
 
 
 @pytest.fixture
