@@ -25,6 +25,13 @@ class FakeVLLM:
     chat_content: str = "\n\n5"
     chat_reasoning: str | None = "2 plus 3 is 5."
     finish_reason: str = "stop"
+    # Answer to every chat request that sends tools.
+    tool_name: str = "run_sql"
+    tool_arguments: str = '{"query": "SELECT COUNT(*) FROM customers;"}'
+    # False answers like vLLM without --tool-call-parser: the call stays as text in "content".
+    tool_parser_on: bool = True
+    # Answer to every chat request that sends response_format.
+    json_content: str = '{"answer": 5}'
     # The Authorization header of every request, or None when a request had none.
     auth_headers: list[str | None] = field(default_factory=list)
     # The JSON body of every POST request, in order.
@@ -51,9 +58,10 @@ def _handler_for(fake: FakeVLLM) -> type[BaseHTTPRequestHandler]:
         def do_POST(self) -> None:
             fake.auth_headers.append(self.headers.get("Authorization"))
             length = int(self.headers.get("Content-Length", "0"))
-            fake.requests.append(json.loads(self.rfile.read(length)))
+            request = json.loads(self.rfile.read(length))
+            fake.requests.append(request)
             if self.path == "/v1/chat/completions":
-                self._send(200, _chat_completion(fake))
+                self._send(200, _chat_completion(fake, request))
             else:
                 self._send(404, {"error": f"no route for {self.path}"})
 
@@ -71,15 +79,27 @@ def _handler_for(fake: FakeVLLM) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
-def _chat_completion(fake: FakeVLLM) -> dict[str, object]:
+def _chat_completion(fake: FakeVLLM, request: dict[str, Any]) -> dict[str, object]:
     """A response shaped like vLLM's, including its extra "reasoning" field."""
-    message = {"role": "assistant", "content": fake.chat_content, "reasoning": fake.chat_reasoning}
+    message: dict[str, object] = {"role": "assistant", "reasoning": fake.chat_reasoning}
+    finish_reason = fake.finish_reason
+    call = {"name": fake.tool_name, "arguments": fake.tool_arguments}
+    if "response_format" in request:
+        message["content"] = fake.json_content
+    elif "tools" not in request:
+        message["content"] = fake.chat_content
+    elif fake.tool_parser_on:
+        message["content"] = None
+        message["tool_calls"] = [{"id": "call-fake", "type": "function", "function": call}]
+        finish_reason = "tool_calls"
+    else:
+        message["content"] = f"<tool_call>{json.dumps(call)}</tool_call>"
     return {
         "id": "chatcmpl-fake",
         "object": "chat.completion",
         "created": 0,
         "model": "local-llm",
-        "choices": [{"index": 0, "message": message, "finish_reason": fake.finish_reason}],
+        "choices": [{"index": 0, "message": message, "finish_reason": finish_reason}],
         "usage": {"prompt_tokens": 20, "completion_tokens": 12, "total_tokens": 32},
     }
 

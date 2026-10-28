@@ -4,6 +4,7 @@ Every check returns a CheckResult instead of raising, so one failure never hides
 and the command always prints a full report. Exit code 0 means every check passed.
 """
 
+import json
 import time
 import urllib.error
 import urllib.request
@@ -11,13 +12,45 @@ from dataclasses import dataclass
 
 import openai
 from openai import OpenAI
+from openai.types.chat import ChatCompletionFunctionToolParam, ChatCompletionMessageFunctionToolCall
+from openai.types.shared_params import ResponseFormatJSONSchema
 
 from omniengine.settings import ServerSettings
 
 # Seconds to wait for one answer before the check counts as failed.
 TIMEOUT_SECONDS = 30.0
+
 # Room for Qwen3's thinking before the answer; too small and the answer is cut off.
 CHAT_MAX_TOKENS = 1024
+
+# The kind of tool analyst-agent gives the model: a JSON schema the arguments must follow.
+RUN_SQL_TOOL: ChatCompletionFunctionToolParam = {
+    "type": "function",
+    "function": {
+        "name": "run_sql",
+        "description": "Run a read-only SQL query and return the rows",
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        },
+    },
+}
+
+# Asks for JSON that follows this schema; vLLM then only lets the model write matching tokens.
+SUM_FORMAT: ResponseFormatJSONSchema = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "sum",
+        "schema": {
+            "type": "object",
+            "properties": {"answer": {"type": "integer"}},
+            "required": ["answer"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -96,6 +129,63 @@ def check_chat(client: OpenAI, settings: ServerSettings) -> CheckResult:
     return CheckResult("chat", True, f"answered {content!r} in {seconds:.1f} s ({tokens} tokens)")
 
 
+def check_tools(client: OpenAI, settings: ServerSettings) -> CheckResult:
+    """A question only a tool can answer: the model must call run_sql with valid JSON arguments."""
+    try:
+        completion = client.chat.completions.create(
+            model=settings.model,
+            messages=[{"role": "user", "content": "How many rows does the customers table have?"}],
+            tools=[RUN_SQL_TOOL],
+            max_tokens=CHAT_MAX_TOKENS,
+        )
+    except openai.OpenAIError as error:
+        return CheckResult("tools", False, f"request failed: {error}")
+    choice = completion.choices[0]
+    calls = choice.message.tool_calls or []
+    if choice.finish_reason != "tool_calls" or not calls:
+        # A <tool_call> tag inside the content means the tool-call parser is missing or wrong.
+        content = (choice.message.content or "").strip()
+        reason = f"no tool call, finish_reason {choice.finish_reason!r}"
+        return CheckResult("tools", False, f"{reason}: {content[:60]!r}")
+    call = calls[0]
+    if not isinstance(call, ChatCompletionMessageFunctionToolCall):
+        return CheckResult("tools", False, f"expected a function call, got type {call.type!r}")
+    if call.function.name != "run_sql":
+        return CheckResult("tools", False, f"called {call.function.name!r} instead of 'run_sql'")
+    # The arguments arrive as a JSON string; an agent must be able to parse them as-is.
+    try:
+        arguments = json.loads(call.function.arguments)
+    except json.JSONDecodeError:
+        return CheckResult("tools", False, f"arguments are not JSON: {call.function.arguments!r}")
+    query = arguments.get("query") if isinstance(arguments, dict) else None
+    if not isinstance(query, str):
+        return CheckResult("tools", False, f"no 'query' string in {call.function.arguments!r}")
+    return CheckResult("tools", True, f"called run_sql with {query!r}")
+
+
+def check_structured(client: OpenAI, settings: ServerSettings) -> CheckResult:
+    """response_format with a JSON schema: the answer must be JSON that follows the schema."""
+    try:
+        completion = client.chat.completions.create(
+            model=settings.model,
+            messages=[{"role": "user", "content": "What is 2 + 3? Reply in JSON."}],
+            response_format=SUM_FORMAT,
+            max_tokens=CHAT_MAX_TOKENS,
+        )
+    except openai.OpenAIError as error:
+        return CheckResult("json", False, f"request failed: {error}")
+    content = (completion.choices[0].message.content or "").strip()
+    try:
+        answer = json.loads(content)
+    except json.JSONDecodeError:
+        return CheckResult("json", False, f"content is not JSON: {content[:60]!r}")
+    # bool is a subclass of int in Python, so true/false must be ruled out on their own.
+    value = answer.get("answer") if isinstance(answer, dict) else None
+    if not isinstance(value, int) or isinstance(value, bool):
+        return CheckResult("json", False, f"no integer 'answer' in {content[:60]!r}")
+    return CheckResult("json", True, f"returned {content}")
+
+
 def run(settings: ServerSettings) -> int:
     """Run every check, print one line per check, and return the exit code."""
     client = make_client(settings)
@@ -103,6 +193,8 @@ def run(settings: ServerSettings) -> int:
         check_health(settings),
         check_models(client, settings),
         check_chat(client, settings),
+        check_tools(client, settings),
+        check_structured(client, settings),
     ]
     for result in results:
         print(f"{'PASS' if result.passed else 'FAIL'}  {result.name:<8} {result.detail}")
