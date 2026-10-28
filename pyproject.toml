@@ -14,7 +14,7 @@ authors = [
     { name = "fadelkresna", email = "kresnadfadel@gmail.com" }
 ]
 requires-python = ">=3.12"
-# Runtime dependencies of the omniengine tooling. Empty for now; vLLM itself is
+# Runtime dependencies of the omniengine tooling ; vLLM itself is
 # never installed here because it runs inside its own container.
 dependencies = [
     "huggingface-hub>=2.3.0",
