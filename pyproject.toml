@@ -18,6 +18,7 @@ requires-python = ">=3.12"
 # never installed here because it runs inside its own container.
 dependencies = [
     "huggingface-hub>=2.3.0",
+    "openai>=3.40.0",
 ]
 
 # Installs a command named `omniengine` that calls main() in src/omniengine/cli.py.

@@ -2,8 +2,9 @@
 
 import pytest
 
-from omniengine import __version__, models
+from omniengine import __version__, models, smoke
 from omniengine.cli import main
+from omniengine.settings import ServerSettings
 
 
 def test_version_flag_prints_version(capsys: pytest.CaptureFixture[str]) -> None:
@@ -34,3 +35,15 @@ def test_models_actions_reach_models_run(action: str, monkeypatch: pytest.Monkey
     monkeypatch.setattr(models, "run", fake_run)
     assert main(["models", action]) == 0
     assert received == [action]
+
+
+def test_smoke_passes_the_base_url_to_the_checks(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: list[ServerSettings] = []
+
+    def fake_run(settings: ServerSettings) -> int:
+        received.append(settings)
+        return 0
+
+    monkeypatch.setattr(smoke, "run", fake_run)
+    assert main(["smoke", "--base-url", "http://gpu-box:8000/v1/"]) == 0
+    assert received[0].base_url == "http://gpu-box:8000/v1"
