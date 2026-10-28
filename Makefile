@@ -14,10 +14,12 @@ setup: ## Install dependencies exactly as locked in uv.lock and the git pre-comm
 	uv sync --locked
 	uv run pre-commit install
 
+# The last line fills compose.yaml from .env.example, not .env, so a variable missing there fails.
 lint: ## Check style, common bugs and types without changing any file
 	uv run ruff check .
 	uv run ruff format --check .
 	uv run mypy
+	docker compose --env-file .env.example config --quiet
 
 format: ## Fix what ruff can fix automatically and reformat the code
 	uv run ruff check --fix .
