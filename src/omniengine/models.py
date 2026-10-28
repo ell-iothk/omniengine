@@ -5,12 +5,9 @@ identical: large Git LFS files (the weights) are compared by SHA-256, small file
 blob hash. The folder may be shared with other projects, so files are only ever added, never
 changed or deleted.
 
-Run from the repo root (the Makefile does this):
-    uv run --env-file .env python -m omniengine.models pull     # download if missing, then verify
-    uv run --env-file .env python -m omniengine.models verify   # verify only, never download
+Used by `omniengine models pull` and `omniengine models verify` (see cli.py).
 """
 
-import argparse
 import hashlib
 import os
 import sys
@@ -115,15 +112,11 @@ def _setting(name: str) -> str:
     return value
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="python -m omniengine.models",
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,  # keep the docstring's line breaks
-    )
-    parser.add_argument("action", choices=["pull", "verify"])
-    args = parser.parse_args(argv)
+def run(action: str) -> int:
+    """Check the model set in .env against its pinned revision; "pull" downloads it first.
 
+    Returns the exit code: 0 when the folder matches, 1 when files are missing or different.
+    """
     folder = Path(_setting("OMNIENGINE_MODELS_DIR")) / _setting("OMNIENGINE_MODEL_DIR_NAME")
     repo_id = _setting("OMNIENGINE_MODEL_ID")
     revision = _setting("OMNIENGINE_MODEL_REVISION")
@@ -134,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Download only into a new folder, or resume a download huggingface_hub itself started.
     # A folder made any other way may belong to another project, so it is never written to.
-    if args.action == "pull" and (not folder.exists() or _downloaded_here(folder)):
+    if action == "pull" and (not folder.exists() or _downloaded_here(folder)):
         print(f"Downloading {label} into {folder} ...")
         snapshot_download(repo_id=repo_id, revision=revision, local_dir=folder, token=token)
 
@@ -146,7 +139,3 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(f"OK: {folder} matches {label}.")
     return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

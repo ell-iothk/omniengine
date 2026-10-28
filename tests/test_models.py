@@ -7,7 +7,7 @@ import pytest
 from huggingface_hub.hf_api import BlobLfsInfo, RepoSibling
 
 from omniengine import models
-from omniengine.models import RemoteFile, git_blob_sha1, main, remote_files, sha256_of, verify
+from omniengine.models import RemoteFile, git_blob_sha1, remote_files, run, sha256_of, verify
 
 # `printf 'hello\n' | git hash-object --stdin` prints this blob id. It is a public hash, not a
 # secret, so the pragma tells detect-secrets to skip it.
@@ -99,7 +99,7 @@ def test_remote_files_reads_hashes_and_skips_gitattributes(
     ]
 
 
-def test_main_stops_when_a_setting_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_stops_when_a_setting_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("OMNIENGINE_MODELS_DIR", raising=False)
     with pytest.raises(SystemExit, match="OMNIENGINE_MODELS_DIR is not set"):
-        main(["verify"])
+        run("verify")

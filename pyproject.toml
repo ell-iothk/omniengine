@@ -20,9 +20,9 @@ dependencies = [
     "huggingface-hub>=2.3.0",
 ]
 
-# Installs a command named `omniengine` that calls omniengine.main().
+# Installs a command named `omniengine` that calls main() in src/omniengine/cli.py.
 [project.scripts]
-omniengine = "omniengine:main"
+omniengine = "omniengine.cli:main"
 
 # --- Build backend -----------------------------------------------------------
 # uv_build turns src/omniengine into an installable package (src layout).

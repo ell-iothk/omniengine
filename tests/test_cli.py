@@ -1,0 +1,36 @@
+"""Tests for the `omniengine` command line: argument parsing only, no server or model needed."""
+
+import pytest
+
+from omniengine import __version__, models
+from omniengine.cli import main
+
+
+def test_version_flag_prints_version(capsys: pytest.CaptureFixture[str]) -> None:
+    # argparse handles --version itself: it prints the text, then exits with code 0.
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--version"])
+    assert exit_info.value.code == 0
+    assert capsys.readouterr().out == f"omniengine {__version__}\n"
+
+
+def test_a_command_is_required(capsys: pytest.CaptureFixture[str]) -> None:
+    # Without a command argparse prints usage to stderr and exits with code 2 (wrong usage).
+    with pytest.raises(SystemExit) as exit_info:
+        main([])
+    assert exit_info.value.code == 2
+    assert "required: COMMAND" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("action", ["pull", "verify"])
+def test_models_actions_reach_models_run(action: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Replace models.run so the test checks only the wiring: no settings, network or files.
+    received: list[str] = []
+
+    def fake_run(requested: str) -> int:
+        received.append(requested)
+        return 0
+
+    monkeypatch.setattr(models, "run", fake_run)
+    assert main(["models", action]) == 0
+    assert received == [action]

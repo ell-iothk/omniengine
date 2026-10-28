@@ -15,7 +15,7 @@ setup: ## Install dependencies exactly as locked in uv.lock and the git pre-comm
 	uv run pre-commit install
 
 # The last line fills compose.yaml from .env.example, not .env, so a variable missing there fails.
-lint: ## Check style, common bugs and types without changing any file
+lint: ## Check style, common bugs, types and compose.yaml without changing any file
 	uv run ruff check .
 	uv run ruff format --check .
 	uv run mypy
@@ -32,10 +32,10 @@ check: lint test ## Everything CI runs: lint, tests, then every pre-commit hook 
 	uv run pre-commit run --all-files
 
 pull-model: ## Download the model set in .env into OMNIENGINE_MODELS_DIR if missing, then verify it
-	uv run --env-file .env python -m omniengine.models pull
+	uv run --env-file .env omniengine models pull
 
 verify-model: ## Check the model folder against the pinned revision, without downloading anything
-	uv run --env-file .env python -m omniengine.models verify
+	uv run --env-file .env omniengine models verify
 
 # --- Serving stack (needs .env, the GPU, and no other vLLM server running) ---------------------
 
