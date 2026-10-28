@@ -2,7 +2,7 @@
 # Run `make help` to list targets. Recipe lines MUST be indented with a TAB, not spaces.
 
 # Targets below are commands, not files; .PHONY stops make from looking for files with these names.
-.PHONY: help setup lint format test check pull-model verify-model up down logs ps
+.PHONY: help setup lint format test check pull-model verify-model up down logs ps smoke test-gpu
 
 # Running plain `make` shows the help text.
 .DEFAULT_GOAL := help
@@ -50,3 +50,9 @@ logs: ## Follow vLLM's log (Ctrl+C stops following, the server keeps running)
 
 ps: ## Show the container's state and health
 	docker compose ps
+
+smoke: ## Check the running server like an agent: health, models, chat, tools, JSON output
+	uv run --env-file .env omniengine smoke
+
+test-gpu: ## Run the tests marked gpu against the running server (start it with make up)
+	uv run --env-file .env pytest -m gpu
