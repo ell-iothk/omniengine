@@ -2,7 +2,7 @@
 # Run `make help` to list targets. Recipe lines MUST be indented with a TAB, not spaces.
 
 # Targets below are commands, not files; .PHONY stops make from looking for files with these names.
-.PHONY: help setup lint format test check pull-model verify-model
+.PHONY: help setup lint format test check pull-model verify-model up down logs ps
 
 # Running plain `make` shows the help text.
 .DEFAULT_GOAL := help
@@ -34,3 +34,17 @@ pull-model: ## Download the model set in .env into OMNIENGINE_MODELS_DIR if miss
 
 verify-model: ## Check the model folder against the pinned revision, without downloading anything
 	uv run --env-file .env python -m omniengine.models verify
+
+# --- Serving stack (needs .env, the GPU, and no other vLLM server running) ---------------------
+
+up: ## Start vLLM in the background and wait up to 15 minutes until it reports healthy
+	docker compose up --detach --wait --wait-timeout 900
+
+down: ## Stop and remove the vLLM container; models, volumes and the image stay
+	docker compose down
+
+logs: ## Follow vLLM's log (Ctrl+C stops following, the server keeps running)
+	docker compose logs --follow --tail 200 vllm
+
+ps: ## Show the container's state and health
+	docker compose ps
