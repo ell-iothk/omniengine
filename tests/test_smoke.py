@@ -107,9 +107,12 @@ def test_tools_fails_when_the_arguments_are_not_json(fake_vllm: FakeVLLM) -> Non
 
 
 def test_structured_passes_and_sends_the_schema(fake_vllm: FakeVLLM) -> None:
+    # The real server spread this answer over three lines; the report must stay one line.
+    fake_vllm.json_content = '{\n\n"answer": 5\n}'
     settings = _settings(fake_vllm)
     result = check_structured(make_client(settings), settings)
     assert result.passed, result.detail
+    assert result.detail == 'returned {"answer": 5}'
     assert fake_vllm.requests[-1]["response_format"]["type"] == "json_schema"
 
 

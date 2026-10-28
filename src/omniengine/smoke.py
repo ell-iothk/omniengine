@@ -183,7 +183,8 @@ def check_structured(client: OpenAI, settings: ServerSettings) -> CheckResult:
     value = answer.get("answer") if isinstance(answer, dict) else None
     if not isinstance(value, int) or isinstance(value, bool):
         return CheckResult("json", False, f"no integer 'answer' in {content[:60]!r}")
-    return CheckResult("json", True, f"returned {content}")
+        # Re-encode compactly: vLLM may spread the JSON over lines, the report needs one line.
+    return CheckResult("json", True, f"returned {json.dumps(answer)}")
 
 
 def run(settings: ServerSettings) -> int:
