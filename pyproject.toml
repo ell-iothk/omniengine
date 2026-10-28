@@ -16,7 +16,9 @@ authors = [
 requires-python = ">=3.12"
 # Runtime dependencies of the omniengine tooling. Empty for now; vLLM itself is
 # never installed here because it runs inside its own container.
-dependencies = []
+dependencies = [
+    "huggingface-hub>=2.3.0",
+]
 
 # Installs a command named `omniengine` that calls omniengine.main().
 [project.scripts]

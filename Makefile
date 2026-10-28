@@ -2,13 +2,13 @@
 # Run `make help` to list targets. Recipe lines MUST be indented with a TAB, not spaces.
 
 # Targets below are commands, not files; .PHONY stops make from looking for files with these names.
-.PHONY: help setup lint format test check
+.PHONY: help setup lint format test check pull-model verify-model
 
 # Running plain `make` shows the help text.
 .DEFAULT_GOAL := help
 
 help: ## Show this list of targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-8s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-12s %s\n", $$1, $$2}'
 
 setup: ## Install dependencies exactly as locked in uv.lock and the git pre-commit hook
 	uv sync --locked
@@ -28,3 +28,9 @@ test: ## Run the tests that need no GPU (the same set CI runs)
 
 check: lint test ## Everything CI runs: lint, tests, then every pre-commit hook on all files
 	uv run pre-commit run --all-files
+
+pull-model: ## Download the model set in .env into OMNIENGINE_MODELS_DIR if missing, then verify it
+	uv run --env-file .env python -m omniengine.models pull
+
+verify-model: ## Check the model folder against the pinned revision, without downloading anything
+	uv run --env-file .env python -m omniengine.models verify
