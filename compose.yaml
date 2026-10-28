@@ -1,0 +1,61 @@
+# compose.yaml: the OmniEngine serving stack, started with `docker compose up`.
+# Every value comes from .env (copied from .env.example); see that file for what each setting means.
+
+# Project name: prefixes the network and volume names, so no container_name is needed.
+name: omniengine
+
+services:
+  # vLLM serves one model behind an OpenAI-compatible API (/v1/chat/completions, /v1/models).
+  vllm:
+    # Pinned by tag for people and by digest for machines: the digest locks the exact image.
+    image: vllm/vllm-openai:v0.32.0@sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34
+    # Arguments for the image's built-in `vllm serve`: the model folder first, then flags.
+    command:
+      - /models/${OMNIENGINE_MODEL_DIR_NAME:?set OMNIENGINE_MODEL_DIR_NAME in .env}
+      # Agents send this alias as "model" and never see the real model name.
+      - --served-model-name
+      - ${OMNIENGINE_MODEL_ALIAS:-local-llm}
+      # Share of GPU memory vLLM may take for weights and KV cache.
+      - --gpu-memory-utilization
+      - ${OMNIENGINE_GPU_MEMORY_UTILIZATION:-0.85}
+      # Longest prompt plus answer in tokens; it sizes the KV cache.
+      - --max-model-len
+      - ${OMNIENGINE_MAX_MODEL_LEN:-8192}
+    environment:
+      # Read models only from the mounted folder; never call the Hugging Face Hub at runtime.
+      HF_HUB_OFFLINE: "1"
+      # vLLM checks this key on every request when it is not empty.
+      VLLM_API_KEY: ${OMNIENGINE_API_KEY:-}
+    ports:
+      # host address:host port -> container port 8000, where vLLM listens.
+      - ${OMNIENGINE_BIND_ADDRESS:-127.0.0.1}:${OMNIENGINE_PORT:-8000}:8000
+    volumes:
+      # The models folder, read-only: OmniEngine never changes or deletes model files.
+      - ${OMNIENGINE_MODELS_DIR:?set OMNIENGINE_MODELS_DIR in .env}:/models:ro
+      # Compiled kernels survive container restarts, so later starts are faster.
+      - vllm-cache:/root/.cache/vllm
+    # Shared memory for vLLM's worker processes; Docker's 64 MB default is too small.
+    shm_size: 2gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            # One NVIDIA GPU, handed over by the NVIDIA Container Toolkit.
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      # Healthy once /health answers 200; python3 is in the image, curl may not be.
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      # Loading weights and compiling kernels takes minutes; failures before this do not count.
+      start_period: 10m
+
+volumes:
+  vllm-cache:
