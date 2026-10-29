@@ -60,7 +60,9 @@ def _handler_for(fake: FakeVLLM) -> type[BaseHTTPRequestHandler]:
             length = int(self.headers.get("Content-Length", "0"))
             request = json.loads(self.rfile.read(length))
             fake.requests.append(request)
-            if self.path == "/v1/chat/completions":
+            if self.path == "/v1/chat/completions" and request.get("stream"):
+                self._send_stream(_chat_chunks(fake))
+            elif self.path == "/v1/chat/completions":
                 self._send(200, _chat_completion(fake, request))
             else:
                 self._send(404, {"error": f"no route for {self.path}"})
@@ -72,6 +74,15 @@ def _handler_for(fake: FakeVLLM) -> type[BaseHTTPRequestHandler]:
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+
+        def _send_stream(self, chunks: list[dict[str, object]]) -> None:
+            # Server-sent events, as vLLM streams: one "data: <json>" line per chunk, then [DONE].
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for chunk in chunks:
+                self.wfile.write(f"data: {json.dumps(chunk)}\n\n".encode())
+            self.wfile.write(b"data: [DONE]\n\n")
 
         def log_message(self, format: str, *args: object) -> None:
             """Silence the default one-line-per-request log, so test output stays readable."""
@@ -102,6 +113,23 @@ def _chat_completion(fake: FakeVLLM, request: dict[str, Any]) -> dict[str, objec
         "choices": [{"index": 0, "message": message, "finish_reason": finish_reason}],
         "usage": {"prompt_tokens": 20, "completion_tokens": 12, "total_tokens": 32},
     }
+
+
+def _chat_chunks(fake: FakeVLLM) -> list[dict[str, object]]:
+    """A streamed answer: the thinking first, then the answer one character per chunk."""
+    deltas: list[dict[str, object]] = [{"role": "assistant", "reasoning": fake.chat_reasoning}]
+    deltas += [{"content": char} for char in fake.chat_content]
+    chunks: list[dict[str, object]] = [
+        {
+            "id": "chatcmpl-fake",
+            "object": "chat.completion.chunk",
+            "created": 0,
+            "model": "local-llm",
+            "choices": [{"index": 0, "delta": delta, "finish_reason": None}],
+        }
+        for delta in deltas
+    ]
+    return chunks
 
 
 @pytest.fixture

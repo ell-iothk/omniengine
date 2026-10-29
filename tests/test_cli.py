@@ -2,7 +2,7 @@
 
 import pytest
 
-from omniengine import __version__, models, smoke
+from omniengine import __version__, chat, models, smoke
 from omniengine.cli import main
 from omniengine.settings import ServerSettings
 
@@ -47,3 +47,16 @@ def test_smoke_passes_the_base_url_to_the_checks(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(smoke, "run", fake_run)
     assert main(["smoke", "--base-url", "http://gpu-box:8000/v1/"]) == 0
     assert received[0].base_url == "http://gpu-box:8000/v1"
+
+
+def test_chat_passes_the_base_url_and_show_thinking(monkeypatch: pytest.MonkeyPatch) -> None:
+    received: list[tuple[ServerSettings, bool]] = []
+
+    def fake_run(settings: ServerSettings, show_thinking: bool = False) -> int:
+        received.append((settings, show_thinking))
+        return 0
+
+    monkeypatch.setattr(chat, "run", fake_run)
+    assert main(["chat", "--base-url", "http://gpu-box:8000/v1", "--show-thinking"]) == 0
+    assert received[0][0].base_url == "http://gpu-box:8000/v1"
+    assert received[0][1] is True
