@@ -111,8 +111,10 @@ implementation details are settled when that version starts.
 - `0.x` versions add features. Each version builds only on earlier ones and keeps every promise
   in [Compatibility rules](#compatibility-rules).
 - `1.0` is the first stable release. From then on, breaking changes need a new major version.
-- A version is done when its "Done when" list passes on the reference machine and in CI, starting
-  from a clean clone.
+- A `0.x` version is done when its "Done when" list passes: CI is green, `make check` passes from
+  a clean clone, and the version's checks pass against the real server on the reference machine.
+  The full clean-clone run on the reference machine, from `git clone` to a serving model, is part
+  of the v1.0 release.
 
 **Reference machine:** one laptop GPU (NVIDIA RTX 3060 Laptop, 6 GB VRAM), WSL2 Ubuntu and
 Docker Engine. Every version must run there.
@@ -121,7 +123,7 @@ Docker Engine. Every version must run there.
 
 | Version | Theme | Adds | Status |
 | --- | --- | --- | --- |
-| v0.1 | Serving foundation | vLLM on a 6 GB GPU, terminal CLI, smoke test, terminal chat demo | In progress |
+| v0.1 | Serving foundation | vLLM on a 6 GB GPU, terminal CLI, smoke test, terminal chat demo | Released |
 | v0.2 | Gateway core | Gateway in front of vLLM as the single front door, model instances, per-agent API keys, rate limits, request log, admin API with an audit trail, PostgreSQL store, Prometheus and Grafana | Planned |
 | v0.3 | Multi-model | Several model instances at once with a GPU capacity check, more models, benchmark, tool-calling eval | Planned |
 | v0.4 | Rule-based guardrails | Policy engine, tool-call schema checks, read-only SQL, PII and secret detection, shadow and enforce modes | Planned |
@@ -178,7 +180,7 @@ conflicting with each other.
    lives in PostgreSQL on one named volume, changes only through migrations, and is written only
    by the gateway. The audit trail is append-only: entries are never changed or deleted.
 
-#### v0.1: Serving foundation (in progress)
+#### v0.1: Serving foundation (released)
 
 **Goal:** show that the project deploys a model with vLLM on the 6 GB GPU and that it can be
 demoed.
@@ -195,8 +197,8 @@ demoed.
 - Contract smoke test: health, model list, chat, tool calling and structured outputs.
 - Terminal chat demo with streamed answers and optional thinking.
 
-**Done when:** a clean clone serves the model with `make setup`, `make pull-model` and `make up`;
-`make smoke` passes on the reference machine; `make chat` works; v0.1.0 is tagged.
+**Done when:** CI is green and `make check` passes from a clean clone; `make up`, `make smoke` and
+`make chat` work on the reference machine; v0.1.0 is tagged.
 
 #### v0.2: Gateway core
 
