@@ -6,7 +6,7 @@
 [project]
 name = "omniengine"
 version = "0.1.0"
-description = "Observable LLM Inference Platform Powered by vLLM for Agentic API Integration"
+description = "Self-Hosted LLM Gateway for Agentic Apps, Powered by vLLM"
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
